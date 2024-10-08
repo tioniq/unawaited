@@ -1,5 +1,9 @@
 type PromiseOrNothing = Promise<any> | PromiseLike<any> | undefined | null | void
 
+export type ErrorCallback = (e: any) => void
+export type Source = Symbol | string | number | object | null | undefined
+export type ErrorCallbackOrSource = ErrorCallback | Source
+
 /**
  * A function that takes a promise or function that returns a promise and handles it to prevent unhandled promise
  * rejections. It will never throw an error. If the promise or function throws an error, it will be caught and passed
@@ -8,56 +12,67 @@ type PromiseOrNothing = Promise<any> | PromiseLike<any> | undefined | null | voi
  * the source of the promise or function if needed.
  *
  * @param promiseOrFunction The promise or function that returns a promise to handle
- * @param source The source of the promise or function
+ * @param errorCallbackOrSource The source of the promise or function
  */
-export function unawaited(promiseOrFunction: (() => PromiseOrNothing) | PromiseOrNothing, source?: any): void {
+export function unawaited(promiseOrFunction: (() => PromiseOrNothing) | PromiseOrNothing, errorCallbackOrSource?: ErrorCallbackOrSource): void {
   if (!promiseOrFunction) {
     return
   }
   if (promiseOrFunction instanceof Promise) {
-    handlePromise(promiseOrFunction, source)
+    handlePromise(promiseOrFunction, errorCallbackOrSource)
     return
   }
   if (typeof promiseOrFunction !== "function") {
     if (typeof promiseOrFunction === "object") {
       if (typeof promiseOrFunction.then === "function") {
-        handlePromiseLike(promiseOrFunction, source)
+        handlePromiseLike(promiseOrFunction, errorCallbackOrSource)
         return
       }
     }
-    unawaited.unknownValueHandler(promiseOrFunction, source)
+    unawaited.unknownValueHandler(promiseOrFunction, errorCallbackOrSource)
     return
   }
   let result: any
   try {
     result = promiseOrFunction()
   } catch (e) {
-    unawaited.exceptionHandler(e, source)
+    handleException(e, errorCallbackOrSource)
   }
   if (result instanceof Promise) {
-    handlePromise(result, source)
+    handlePromise(result, errorCallbackOrSource)
     return
   }
   if (typeof result === "object") {
     if (typeof result.then === "function") {
-      handlePromiseLike(result, source)
+      handlePromiseLike(result, errorCallbackOrSource)
     }
   }
 }
 
-function handlePromise(promise: Promise<any>, source: any): void {
+function handlePromise(promise: Promise<any>, errorCallbackOrSource: ErrorCallbackOrSource): void {
   try {
-    promise.catch(e => unawaited.exceptionHandler(e, source))
+    promise.catch(e => handleException(e, errorCallbackOrSource))
   } catch (e) {
-    unawaited.exceptionHandler(e, source)
+    handleException(e, errorCallbackOrSource)
   }
 }
 
-function handlePromiseLike(promiseLike: PromiseLike<any>, source: any): void {
+function handlePromiseLike(promiseLike: PromiseLike<any>, errorCallbackOrSource: ErrorCallbackOrSource): void {
   try {
-    Promise.resolve(promiseLike).catch(e => unawaited.exceptionHandler(e, source))
+    Promise.resolve(promiseLike).catch(e => handleException(e, errorCallbackOrSource))
   } catch (e) {
-    unawaited.exceptionHandler(e, source)
+    handleException(e, errorCallbackOrSource)
+  }
+}
+
+function handleException(e: any, errorCallbackOrSource: ErrorCallbackOrSource): void {
+  if (typeof errorCallbackOrSource !== "function") {
+    unawaited.exceptionHandler(e, errorCallbackOrSource)
+    return
+  }
+  errorCallbackOrSource(e)
+  if (unawaited.alwaysPassExceptionToHandler) {
+    unawaited.exceptionHandler(e, errorCallbackOrSource)
   }
 }
 
@@ -66,7 +81,7 @@ function handlePromiseLike(promiseLike: PromiseLike<any>, source: any): void {
  * @param e The error that was thrown
  * @param source The source of the promise or function
  */
-unawaited.exceptionHandler = function (e: any, source: any): void {
+unawaited.exceptionHandler = function (e: any, source: ErrorCallbackOrSource): void {
 
 }
 
@@ -75,6 +90,11 @@ unawaited.exceptionHandler = function (e: any, source: any): void {
  * @param value The value that was not a promise or function
  * @param source The source of the value
  */
-unawaited.unknownValueHandler = function (value: any, source: any): void {
+unawaited.unknownValueHandler = function (value: any, source: ErrorCallbackOrSource): void {
 
 }
+
+/**
+ * If true, exceptions will always be passed to the exception handler even if an error callback is provided.
+ */
+unawaited.alwaysPassExceptionToHandler = true

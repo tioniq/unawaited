@@ -1,4 +1,4 @@
-import {unawaited} from "../src";
+import { unawaited } from "../src";
 
 describe('unawaited unsupported types', () => {
   it('null', () => {
@@ -208,5 +208,48 @@ describe('should pass source', () => {
     unawaited(obj as any, source)
     await jest.runAllTimersAsync()
     expect(handler).toHaveBeenCalledWith(obj, source)
+  })
+})
+
+describe('should call callback', () => {
+  beforeAll(() => {
+    jest.useFakeTimers()
+  })
+  afterAll(() => {
+    jest.useRealTimers()
+  })
+  it('should call callback', async () => {
+    const callback = jest.fn()
+    unawaited(() => Promise.reject(new Error("error")), callback)
+    await jest.runAllTimersAsync()
+    expect(callback).toHaveBeenCalledWith(expect.any(Error))
+  })
+  it('should not call callback', async () => {
+    const callback = jest.fn()
+    unawaited(() => {
+    }, callback)
+    await jest.runAllTimersAsync()
+    expect(callback).not.toHaveBeenCalled()
+  })
+
+  it('should call global exception handler', async () => {
+    const handler = unawaited.exceptionHandler = jest.fn()
+    unawaited(() => {
+      throw new Error('error')
+    }, () => {
+    })
+    await jest.runAllTimersAsync()
+    expect(handler).toHaveBeenCalled()
+  })
+
+  it('should not call global exception handler', async () => {
+    unawaited.alwaysPassExceptionToHandler = false
+    const handler = unawaited.exceptionHandler = jest.fn()
+    unawaited(() => {
+    }, () => {
+    })
+    await jest.runAllTimersAsync()
+    expect(handler).not.toHaveBeenCalled()
+    unawaited.alwaysPassExceptionToHandler = true
   })
 })
