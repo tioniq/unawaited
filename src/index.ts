@@ -1,7 +1,18 @@
 type PromiseOrNothing = Promise<any> | PromiseLike<any> | undefined | null | void
 
-export type ErrorCallback = (e: any) => void
+/**
+ * A source key that can be used to identify the source of the error
+ */
 export type Source = Symbol | string | number | object | null | undefined
+
+/**
+ * A callback that takes an error as an argument
+ */
+export type ErrorCallback = (e: any) => void
+
+/**
+ * A callback that takes an error as an argument or a source key
+ */
 export type ErrorCallbackOrSource = ErrorCallback | Source
 
 /**
