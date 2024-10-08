@@ -44,6 +44,7 @@
     "await",
     "awaited",
     "unhandledrejection",
+    "unhandled promise rejection",
     "fire-and-forget"
   ],
   "contributors": [
